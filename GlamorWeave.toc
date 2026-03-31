@@ -1,0 +1,22 @@
+## Interface: 120000
+## Title: GlamorWeave
+## Notes: Syncs outfit names, icons, and situations between alts
+## Notes-esES: Sincroniza nombres, iconos y situaciones de atuendos entre alts
+## Notes-esMX: Sincroniza nombres, iconos y situaciones de atuendos entre alts
+## Author: Kaserhit
+## Version: 0.11.1
+## IconTexture: Interface\AddOns\GlamorWeave\wow_icon
+## SavedVariables: OutfitSyncDB
+## Bindings: Bindings.xml
+
+GlamorWeave.lua
+GlamorWeave_Locale.lua
+GlamorWeave_MainUI.lua
+GlamorWeave_UI.lua
+GlamorWeave_Template.lua
+GlamorWeave_Apply.lua
+GlamorWeave_Slash.lua
+GlamorWeave_UIFrame.lua
+GlamorWeave_QuickAccess.lua
+GlamorWeave_Minimap.lua
+GlamorWeave_Bindings.lua

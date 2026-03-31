@@ -1,0 +1,7 @@
+<Bindings>
+    <Binding name="GLAMORWEAVE_TOGGLE_QUICK_ACCESS" runOnUp="true" default="" hidden="false" category="GlamorWeave">
+        if keystate == "down" then
+            GlamorWeave_ToggleQuickAccess()
+        end
+    </Binding>
+</Bindings>
