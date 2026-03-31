@@ -3,11 +3,10 @@
 GlamorWeave syncs transmog outfits across your alts using WoW Retail's native Outfit Collection.
 
 It syncs:
+
 - name
 - icon
 - situations
-
-SavedVariables remain `OutfitSyncDB` for backward compatibility.
 
 ## English
 
@@ -30,7 +29,6 @@ SavedVariables remain `OutfitSyncDB` for backward compatibility.
 - Wardrobe panel for quick access
 - Import / Export support
 - Blizzard keybinding integration
-- Compatibility with older `OutfitSyncDB` data
 
 ### Notes
 
@@ -60,7 +58,6 @@ GlamorWeave sincroniza atuendos de transfiguracion entre tus alters usando la Ou
 - Panel `Armario` para acceso rapido
 - Soporte de Importar / Exportar
 - Integracion con atajo de teclado de Blizzard
-- Compatibilidad con datos antiguos de `OutfitSyncDB`
 
 ### Notas
 
@@ -264,4 +261,3 @@ Useful commands:
 
 - WoW Retail 12.0 / Midnight
 - Up to 20 synced outfit slots
-- Backward compatibility with `OutfitSyncDB`
