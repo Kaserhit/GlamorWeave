@@ -432,11 +432,328 @@ function UI.RefreshSelectedIconText()
     end
 end
 
+function UI.SetPopupSelectedIcon(index, texture)
+    local selector = UI.GetIconSelector()
+    if selector and index then
+        selector.selectedIndex = index
+    end
+
+    local popup = UI.GetOutfitPopup()
+    if not popup then
+        return false
+    end
+
+    if index and popup.selectedIndex ~= nil then
+        popup.selectedIndex = index
+    end
+
+    if popup.outfitData then
+        if texture then
+            popup.outfitData.icon = texture
+            popup.outfitData.iconFileDataID = texture
+            popup.outfitData.iconTexture = texture
+        end
+        if index then
+            popup.outfitData.iconIndex = index
+            popup.outfitData.selectedIconIndex = index
+        end
+    end
+
+    return true
+end
+
 function UI.SetPopupOutfitDataIcon(texture)
     local popup = UI.GetOutfitPopup()
     if popup and popup.outfitData then
         popup.outfitData.icon = texture
         return true
+    end
+
+    return false
+end
+
+function UI.GetPopupOkayButton()
+    local popup = UI.GetOutfitPopup()
+    if not popup then
+        return nil
+    end
+
+    if popup.BorderBox and popup.BorderBox.OkayButton then
+        return popup.BorderBox.OkayButton
+    end
+
+    local seen = {}
+    local found
+
+    local function ReadText(object)
+        if type(object) ~= "table" then
+            return nil
+        end
+
+        if object.GetText then
+            local ok, text = pcall(function()
+                return object:GetText()
+            end)
+            if ok and text and text ~= "" then
+                return text
+            end
+        end
+
+        if object.Text and object.Text.GetText then
+            local ok, text = pcall(function()
+                return object.Text:GetText()
+            end)
+            if ok and text and text ~= "" then
+                return text
+            end
+        end
+
+        return nil
+    end
+
+    local function Visit(object, depth, keyName)
+        if found or depth > 5 or type(object) ~= "table" or seen[object] then
+            return
+        end
+        seen[object] = true
+
+        local text = ReadText(object)
+        local lowerKey = type(keyName) == "string" and string.lower(keyName) or ""
+        local isOkayName = lowerKey:find("okay", 1, true) or lowerKey:find("accept", 1, true) or lowerKey:find("confirm", 1, true)
+        local isOkayText = text == "Okay" or text == "OK"
+
+        if (object.Click or object.GetScript) and (isOkayName or isOkayText) then
+            found = object
+            return
+        end
+
+        for key, value in pairs(object) do
+            if type(value) == "table" then
+                Visit(value, depth + 1, tostring(key))
+                if found then
+                    return
+                end
+            end
+        end
+    end
+
+    Visit(popup, 0, "popup")
+    if found then
+        return found
+    end
+
+    return nil
+end
+
+function UI.ClickPopupOkay()
+    local button = UI.GetPopupOkayButton()
+    if button then
+        local buttonName = button.GetName and button:GetName() or "nil"
+        local buttonText = button.GetText and button:GetText() or (button.Text and button.Text.GetText and button.Text:GetText()) or "nil"
+        local enabled = "unknown"
+        if button.IsEnabled then
+            local okEnabled, value = pcall(function()
+                return button:IsEnabled()
+            end)
+            if okEnabled then
+                enabled = tostring(value)
+            end
+        end
+        NS.TechPrint("Popup Okay encontrado name=" .. tostring(buttonName) .. " text=" .. tostring(buttonText) .. " enabled=" .. tostring(enabled))
+
+        if button.Click then
+            local ok = NS.SafeCall("Popup Okay Click", button.Click, button)
+            if ok then
+                return true
+            end
+
+            ok = NS.SafeCall("Popup Okay Click LeftButton", button.Click, button, "LeftButton")
+            if ok then
+                return true
+            end
+        end
+
+        if button.GetScript then
+            local ok, onClick = pcall(function()
+                return button:GetScript("OnClick")
+            end)
+            if ok and onClick then
+                local okClick = NS.SafeCall("Popup Okay OnClick", onClick, button, "LeftButton")
+                if okClick then
+                    return true
+                end
+            end
+        end
+    end
+
+    if UI.ClickVisibleButtonByText then
+        NS.TechPrint("Intentando fallback de Popup Okay por texto visible")
+        if UI.ClickVisibleButtonByText("Okay", 8) then
+            return true
+        end
+        if UI.ClickVisibleButtonByText("OK", 8) then
+            return true
+        end
+    end
+
+    NS.TechPrint("No pude confirmar el popup del icono")
+    return false
+end
+
+function UI.IsPopupShown()
+    local popup = UI.GetOutfitPopup()
+    if not popup or not popup.IsShown then
+        return false
+    end
+
+    local ok, shown = pcall(function()
+        return popup:IsShown()
+    end)
+    return ok and shown == true
+end
+
+local function ReadObjectIconTexture(object)
+    if type(object) ~= "table" then
+        return nil
+    end
+
+    if object.GetIconTexture then
+        local ok, texture = pcall(function()
+            return object:GetIconTexture()
+        end)
+        if ok and texture then
+            return texture
+        end
+    end
+
+    if object.Icon and object.Icon.GetTexture then
+        local ok, texture = pcall(function()
+            return object.Icon:GetTexture()
+        end)
+        if ok and texture then
+            return texture
+        end
+    end
+
+    if object.icon and object.icon.GetTexture then
+        local ok, texture = pcall(function()
+            return object.icon:GetTexture()
+        end)
+        if ok and texture then
+            return texture
+        end
+    end
+
+    if object.Texture and object.Texture.GetTexture then
+        local ok, texture = pcall(function()
+            return object.Texture:GetTexture()
+        end)
+        if ok and texture then
+            return texture
+        end
+    end
+
+    return nil
+end
+
+function UI.FindPopupIconButton(index, texture)
+    local selector = UI.GetIconSelector()
+    if not selector then
+        return nil
+    end
+
+    local seen = {}
+    local found
+
+    local function Matches(object)
+        if type(object) ~= "table" then
+            return false
+        end
+
+        if object.IsShown then
+            local ok, shown = pcall(function()
+                return object:IsShown()
+            end)
+            if ok and shown ~= true then
+                return false
+            end
+        end
+
+        local objectTexture = ReadObjectIconTexture(object)
+        if texture and tonumber(objectTexture) == tonumber(texture) then
+            return true
+        end
+
+        if index and tonumber(object.index) == tonumber(index) then
+            return true
+        end
+
+        if object.GetElementData then
+            local ok, elementData = pcall(function()
+                return object:GetElementData()
+            end)
+            if ok and type(elementData) == "table" then
+                if index and tonumber(elementData.index) == tonumber(index) then
+                    return true
+                end
+                if texture and tonumber(elementData.icon) == tonumber(texture) then
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
+    local function Visit(object, depth)
+        if found or depth > 5 or type(object) ~= "table" or seen[object] then
+            return
+        end
+        seen[object] = true
+
+        local canClick = object.Click or (object.GetScript and object:GetScript("OnClick"))
+        if canClick and Matches(object) then
+            found = object
+            return
+        end
+
+        for _, value in pairs(object) do
+            if type(value) == "table" then
+                Visit(value, depth + 1)
+                if found then
+                    return
+                end
+            end
+        end
+    end
+
+    Visit(selector, 0)
+    return found
+end
+
+function UI.ClickPopupIcon(index, texture)
+    local button = UI.FindPopupIconButton(index, texture)
+    if not button then
+        return false
+    end
+
+    if button.Click then
+        local ok = NS.SafeCall("PopupIcon Click", button.Click, button, "LeftButton")
+        if ok then
+            return true
+        end
+    end
+
+    if button.GetScript then
+        local ok, onClick = pcall(function()
+            return button:GetScript("OnClick")
+        end)
+        if ok and onClick then
+            local okClick = NS.SafeCall("PopupIcon OnClick", onClick, button, "LeftButton")
+            if okClick then
+                return true
+            end
+        end
     end
 
     return false

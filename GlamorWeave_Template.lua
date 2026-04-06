@@ -116,10 +116,18 @@ end
 local function BuildTemplateRow(currentRow, previousRow, templateIndex)
     previousRow = previousRow or {}
 
-    local pickerSelectedIndex = previousRow.pickerSelectedIndex
-    local pickerSelectedTexture = tonumber(previousRow.pickerSelectedTexture or currentRow.iconFileDataID or currentRow.uiTexture)
-    local uiTexture = tonumber(currentRow.uiTexture)
-    local targetTexture = pickerSelectedTexture or uiTexture
+    local currentIconTexture = tonumber(currentRow.uiTexture or currentRow.iconFileDataID)
+    local previousPickerTexture = tonumber(previousRow.pickerSelectedTexture)
+    local pickerSelectedTexture = currentIconTexture or previousPickerTexture or tonumber(currentRow.iconFileDataID)
+    local uiTexture = currentIconTexture
+    local targetTexture = pickerSelectedTexture or uiTexture or tonumber(previousRow.targetTexture)
+    local pickerSelectedIndex
+
+    if previousRow.pickerSelectedIndex and previousPickerTexture and pickerSelectedTexture
+        and tonumber(previousPickerTexture) == tonumber(pickerSelectedTexture) then
+        pickerSelectedIndex = previousRow.pickerSelectedIndex
+    end
+
     local capturedSituationState = UI.CaptureSituationState(currentRow.outfitID)
     local situationState = NormalizeSituationState(capturedSituationState or previousRow.situationState)
     local situationsCaptured = capturedSituationState ~= nil or previousRow.situationsCaptured == true
@@ -129,7 +137,7 @@ local function BuildTemplateRow(currentRow, previousRow, templateIndex)
         rowIndex = currentRow.rowIndex,
         outfitID = currentRow.outfitID,
         name = currentRow.visualName or currentRow.name,
-        iconFileDataID = currentRow.iconFileDataID,
+        iconFileDataID = currentIconTexture or tonumber(currentRow.iconFileDataID) or tonumber(previousRow.iconFileDataID),
         uiTexture = uiTexture,
         targetTexture = targetTexture,
         pickerSelectedIndex = pickerSelectedIndex,

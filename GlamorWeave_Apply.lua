@@ -36,91 +36,172 @@ local function WaitForPickerTexture(targetTexture, attempts, delay, done)
     Step(attempts)
 end
 
-local function TrySelectIconByIndex(index, expectedPickerTexture, onDone)
-    if not index then
-        if expectedPickerTexture then
-            local derivedIndex = UI.GetPopupIndexForTexture and UI.GetPopupIndexForTexture(expectedPickerTexture) or nil
-            if derivedIndex then
-                NS.TechPrint(
-                    "pickerSelectedIndex derivado desde texture" ..
-                    " texture=" .. tostring(expectedPickerTexture) ..
-                    " index=" .. tostring(derivedIndex)
-                )
-                index = derivedIndex
-            else
-                local selected = UI.SetSelectedPickerTextureID(expectedPickerTexture)
-                local popupSet = UI.SetPopupOutfitDataIcon(expectedPickerTexture)
-                UI.RefreshSelectedIconText()
-                NS.TechPrint(
-                    "Fallback de icono sin pickerSelectedIndex" ..
-                    " texture=" .. tostring(expectedPickerTexture) ..
-                    " selected=" .. tostring(selected) ..
-                    " popupSet=" .. tostring(popupSet)
-                )
-                C_Timer.After(0.20, function()
-                    if onDone then onDone(selected or popupSet) end
-                end)
-                return
-            end
+local function ConfirmIconPopupIfNeeded(done)
+    if not UI.IsPopupShown or not UI.IsPopupShown() then
+        NS.TechPrint("Popup de icono no visible; no hace falta confirmar")
+        if done then done(true) end
+        return
+    end
+
+    NS.TechPrint("Popup de icono visible; intentando confirmar")
+    local clicked = UI.ClickPopupOkay and UI.ClickPopupOkay() or false
+    NS.TechPrint("popup okay clicked = " .. tostring(clicked))
+
+    if not clicked then
+        if done then done(false) end
+        return
+    end
+
+    local function Step(remaining)
+        if not UI.IsPopupShown or not UI.IsPopupShown() then
+            if done then done(true) end
+            return
         end
 
-        if not index then
-            NS.TechPrint("No hay pickerSelectedIndex para seleccionar")
+        if remaining <= 0 then
+            if done then done(false) end
+            return
+        end
+
+        C_Timer.After(0.15, function()
+            Step(remaining - 1)
+        end)
+    end
+
+    Step(8)
+end
+
+local function TrySelectIconByIndex(index, expectedPickerTexture, onDone)
+    local function ApplyResolvedIndex(resolvedIndex)
+        local selector = UI.GetIconSelector()
+        if not selector then
+            NS.TechPrint("No encontre IconSelector")
             if onDone then onDone(false) end
             return
         end
-    end
 
-    local selector = UI.GetIconSelector()
-    if not selector then
-        NS.TechPrint("No encontre IconSelector")
-        if onDone then onDone(false) end
-        return
-    end
-
-    local ok = false
-    if selector.SetSelectedIndex then
-        local okSet = NS.SafeCall("SetSelectedIndex", selector.SetSelectedIndex, selector, index)
-        if okSet then
-            ok = true
+        local ok = false
+        if selector.SetSelectedIndex then
+            local okSet = NS.SafeCall("SetSelectedIndex", selector.SetSelectedIndex, selector, resolvedIndex)
+            if okSet then
+                ok = true
+            end
         end
+
+        if not ok then
+            NS.TechPrint("No pude seleccionar pickerSelectedIndex " .. tostring(resolvedIndex))
+            if onDone then onDone(false) end
+            return
+        end
+
+        UI.ScrollToSelectedIcon()
+
+        local indexTexture = UI.GetPopupIconByIndex(resolvedIndex)
+        local resolvedTexture = expectedPickerTexture or indexTexture
+        NS.Debug(
+            "Resolved picker icon index=" .. tostring(resolvedIndex) ..
+            " indexTexture=" .. tostring(indexTexture) ..
+            " resolvedTexture=" .. tostring(resolvedTexture) ..
+            " expectedPickerTexture=" .. tostring(expectedPickerTexture)
+        )
+
+        if resolvedTexture then
+            UI.SetPopupSelectedIcon(resolvedIndex, resolvedTexture)
+            UI.SetSelectedPickerTextureID(resolvedTexture)
+            UI.SetPopupOutfitDataIcon(resolvedTexture)
+            UI.RefreshSelectedIconText()
+        end
+
+        NS.TechPrint("Indice de icono seleccionado: " .. tostring(resolvedIndex))
+
+        C_Timer.After(0.35, function()
+            local wantedTexture = resolvedTexture or expectedPickerTexture
+            local selectedIndex = UI.GetCurrentPickerSelectedIndex()
+            local selectedTexture = UI.GetSelectedPickerTextureID and UI.GetSelectedPickerTextureID() or nil
+
+            NS.TechPrint(
+                "popup state index=" .. tostring(selectedIndex) ..
+                " expectedIndex=" .. tostring(resolvedIndex) ..
+                " texture=" .. tostring(selectedTexture) ..
+                " expectedTexture=" .. tostring(wantedTexture)
+            )
+
+            local function ContinueToConfirm()
+                ConfirmIconPopupIfNeeded(function(confirmOk)
+                    if onDone then onDone(confirmOk) end
+                end)
+            end
+
+            if wantedTexture then
+                WaitForPickerTexture(wantedTexture, 14, 0.15, function(applied)
+                    NS.TechPrint("picker texture applied = " .. tostring(applied))
+                    if not applied then
+                        if onDone then onDone(false) end
+                        return
+                    end
+                    ContinueToConfirm()
+                end)
+                return
+            end
+
+            ContinueToConfirm()
+        end)
     end
 
-    if not ok then
-        NS.TechPrint("No pude seleccionar pickerSelectedIndex " .. tostring(index))
+    if index then
+        ApplyResolvedIndex(index)
+        return
+    end
+
+    if not expectedPickerTexture then
+        NS.TechPrint("No hay pickerSelectedIndex para seleccionar")
         if onDone then onDone(false) end
         return
     end
 
-    UI.ScrollToSelectedIcon()
+    local function ResolveIndex(remaining)
+        local derivedIndex = UI.GetPopupIndexForTexture and UI.GetPopupIndexForTexture(expectedPickerTexture) or nil
+        if derivedIndex then
+            NS.TechPrint(
+                "pickerSelectedIndex derivado desde texture" ..
+                " texture=" .. tostring(expectedPickerTexture) ..
+                " index=" .. tostring(derivedIndex)
+            )
+            ApplyResolvedIndex(derivedIndex)
+            return
+        end
 
-    local indexTexture = UI.GetPopupIconByIndex(index)
-    local resolvedTexture = expectedPickerTexture or indexTexture
-    NS.Debug(
-        "Resolved picker icon index=" .. tostring(index) ..
-        " indexTexture=" .. tostring(indexTexture) ..
-        " resolvedTexture=" .. tostring(resolvedTexture) ..
-        " expectedPickerTexture=" .. tostring(expectedPickerTexture)
-    )
+        if remaining <= 0 then
+            UI.SetPopupSelectedIcon(nil, expectedPickerTexture)
+            local selected = UI.SetSelectedPickerTextureID(expectedPickerTexture)
+            local popupSet = UI.SetPopupOutfitDataIcon(expectedPickerTexture)
+            UI.RefreshSelectedIconText()
+            NS.TechPrint(
+                "Fallback de icono sin pickerSelectedIndex" ..
+                " texture=" .. tostring(expectedPickerTexture) ..
+                " selected=" .. tostring(selected) ..
+                " popupSet=" .. tostring(popupSet)
+            )
+            C_Timer.After(0.35, function()
+                local current = UI.GetSelectedPickerTextureID()
+                if tonumber(current) ~= tonumber(expectedPickerTexture) then
+                    if onDone then onDone(false) end
+                    return
+                end
 
-    if resolvedTexture then
-        UI.SetSelectedPickerTextureID(resolvedTexture)
-        UI.SetPopupOutfitDataIcon(resolvedTexture)
-        UI.RefreshSelectedIconText()
-    end
+                ConfirmIconPopupIfNeeded(function(confirmOk)
+                    if onDone then onDone(confirmOk) end
+                end)
+            end)
+            return
+        end
 
-    NS.TechPrint("Indice de icono seleccionado: " .. tostring(index))
-    if resolvedTexture or expectedPickerTexture then
-        WaitForPickerTexture(resolvedTexture or expectedPickerTexture, 14, 0.15, function(applied)
-            NS.Debug("picker texture applied = " .. tostring(applied))
-            if onDone then onDone(applied) end
+        C_Timer.After(0.15, function()
+            ResolveIndex(remaining - 1)
         end)
-        return
     end
 
-    C_Timer.After(0.20, function()
-        if onDone then onDone(true) end
-    end)
+    ResolveIndex(8)
 end
 
 local function VerifySavedIcon(templateIndex, expectedTexture, onDone)
@@ -357,7 +438,7 @@ function Apply.ApplyOneWithOptions(templateIndex, onDone, options)
             local pickerIndex = row.pickerSelectedIndex
             local expectedPickerTexture = Template.GetExpectedPickerTexture(row)
 
-            if OutfitSyncDB.settings.autoTryIcon and (pickerIndex or expectedPickerTexture) then
+            if pickerIndex or expectedPickerTexture then
                 TrySelectIconByIndex(pickerIndex, expectedPickerTexture, ContinueAfterIcon)
             else
                 ContinueAfterIcon(false)
